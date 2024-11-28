@@ -23,3 +23,5 @@ At location of script, open cmd and run:
 And paste your playlist link!!
 
 You can choose to retrieve your playlist links, and their equivalent links in YT Music or download them using yt-dlp.
+
+### Works only for Windows
