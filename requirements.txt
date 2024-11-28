@@ -1,0 +1,8 @@
+selenium
+beautifulsoup4
+yt_dlp
+pandas
+sanitize-filename
+lxml
+openpyxl
+webdriver-manager
