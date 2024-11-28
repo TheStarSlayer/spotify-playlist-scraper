@@ -1,7 +1,7 @@
 # spotify-playlist-scraper
 
 ## First time usage
-Run: install_ffmpeg.bat or run:
+Run:
 ```winget install "FFmpeg (Essentials Build)"```
 
 Then, open cmd at location of script and run:
