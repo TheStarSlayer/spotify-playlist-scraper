@@ -285,9 +285,13 @@ def retrieve_youtube_links(playlist_detes, playlist_name):
     return df
 
 def download_from_youtube(url):
+    
+    path = os.getenv('LOCALAPPDATA') + 'Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-7.1-essentials_build\\bin\\ffmpeg.exe'
+
     yt_opts = {
         'format': 'bestaudio/best',
         'outtmpl': '%(title)s.%(ext)s',
+        'ffmpeg-location': path,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -318,6 +322,8 @@ def download_songs(playlist_detes, playlist_name, simul_downloads = 6):
     with ThreadPoolExecutor(max_workers=simul_downloads) as executor:
         executor.map(download_from_youtube, urls)
 
+    print("Songs downloaded successfully!")
+
 # Executor Function
 def retrieve_spotify_playlist():
     start_retrieve = time.time()
@@ -333,7 +339,6 @@ def retrieve_spotify_playlist():
 
     print(f"Time taken to retrieve YT music links: {int(end_retrieve - start_retrieve)}s")
 
-    download = str(input("Do you want to download all the songs? (Y/n): ")).lower()
     if download == 'y':
         start_download = time.time()
         download_songs(playlist_detes_df, playlist_name)
