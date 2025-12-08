@@ -45,21 +45,21 @@ def init_playlist():
 
     driver.get(playlist_url)
 
-    # Dismiss alert
-    try:
-        WebDriverWait(driver, 1).until(
-            EC.presence_of_element_located((By.XPATH, '/html/html')) # Deliberate mistake to prevent open app alert
-        )
-    except Exception as e:
-        driver.execute_script('window.open();')
-        driver.switch_to.window(driver.window_handles[1])
-        driver.get(playlist_url)
+    # # Dismiss alert
+    # try:
+    #     WebDriverWait(driver, 1).until(
+    #         EC.presence_of_element_located((By.XPATH, '/html/html')) # Deliberate mistake to prevent open app alert
+    #     )
+    # except Exception as e:
+    #     driver.execute_script('window.open();')
+    #     driver.switch_to.window(driver.window_handles[1])
+    #     driver.get(playlist_url)
 
     # Retrieve playlist name
     playlist_name = ''
     try:
         playlist_name = str(wait.until(
-            EC.presence_of_element_located((By.XPATH, '//*[@id="main"]/div/div[2]/div[4]/div[1]/div[2]/div[2]/div/main/section/div[1]/div[3]/div[3]/span[2]/h1'))
+            EC.presence_of_element_located((By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[1]/div/main/section/div[1]/div[2]/div[3]/span[2]/span/h1'))
         ).text)
         print(f"Playlist Name: {playlist_name}")
     except Exception as e:
@@ -69,20 +69,21 @@ def init_playlist():
     total_songs = 0
     try:
         total_songs = int((wait.until(
-            EC.presence_of_element_located((By.XPATH, '//*[@id="main"]/div/div[2]/div[4]/div[1]/div[2]/div[2]/div/main/section/div[1]/div[3]/div[3]/div/div[2]/span[1]'))
+            EC.presence_of_element_located((By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[1]/div/main/section/div[1]/div[2]/div[3]/div/div[2]/span[1]'))
         ).text).split(' ')[0])
+        print(f"Total songs: {total_songs}")
     except Exception as e:
         print(e)
 
-    # Remove header as it is harder to control scrollbar with it
-    driver.execute_script('''
-        let header = document.querySelector(".facDIsOQo9q7kiWc4jSg");
-        header.parentNode.removeChild(header);
-                        ''')
-    time.sleep(1)
+    # # Remove header as it is harder to control scrollbar with it
+    # driver.execute_script('''
+    #     let header = document.querySelector(".facDIsOQo9q7kiWc4jSg");
+    #     header.parentNode.removeChild(header);
+    #                     ''')
+    # time.sleep(1)
 
     # Retrieve scroll bar element
-    scroll_bar = driver.find_element(By.XPATH, '//*[@id="main"]/div/div[2]/div[4]/div[1]/div[2]/div[4]/div/div')
+    scroll_bar = driver.find_element(By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[3]/div/div')
 
     # Remove footer popup
     try:
@@ -90,8 +91,11 @@ def init_playlist():
             EC.presence_of_element_located((By.XPATH, '//*[@id="onetrust-close-btn-container"]/button'))
         )
         footer_popup.click()
+        print("Clicked popup away!")
     except:
         pass
+
+    #Remove 
 
     # Remove misleading scrollbar if exists
     driver.execute_script('''
@@ -109,8 +113,8 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
 
     soup_list = []
 
-    parse_only = SoupStrainer('div', attrs={'class', 'JUa6JJNj7R_Y3i4P8YUX'})
-    soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[1].contents[1]
+    parse_only = SoupStrainer('div', attrs={"class": 'fNzI6FqqYnAGcGmJjQRG'})
+    soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
 
     current_row = int(soup.contents[0]['aria-rowindex']) # First song of soup
     covered_rows = int(soup.contents[-1]['aria-rowindex']) # Last song of soup
@@ -126,7 +130,7 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
     # Activate scrollbar -- simulate mouse movement
     try:
         active_area = wait.until(
-            EC.presence_of_element_located((By.XPATH, '//*[@id="main"]/div/div[2]/div[4]/div[1]/div[2]/div[2]/div/main/section/div[1]/div[3]/div[3]/div'))
+            EC.presence_of_element_located((By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[3]/div'))
         )
     except:
         pass
@@ -147,19 +151,19 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
             # Scroll and compare current soup's top song to previous soup's last song
             scroll(scroll_bar=scroll_bar, backwards=False)
             try:
-                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[1].contents[1]
+                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
                 current_row = int(soup.contents[0]['aria-rowindex'])
                 temp_covered_rows = int(soup.contents[-1]['aria-rowindex'])
             except KeyError:
                 time.sleep(2)
-                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[1].contents[1]
+                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
                 current_row = int(soup.contents[0]['aria-rowindex'])
                 temp_covered_rows = int(soup.contents[-1]['aria-rowindex'])
             
             # Move back if current row is greater than covered rows
             while current_row > covered_rows + 1:
                 scroll(scroll_bar=scroll_bar, backwards=True)
-                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[1].contents[1]
+                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
                 current_row = int(soup.contents[0]['aria-rowindex'])
 
             scroll_location = scroll_bar.location['y'] + scroll_size['height']
@@ -249,7 +253,7 @@ def retrieve_youtube_links(playlist_detes, playlist_name):
         # Wait till page is loaded
         try:
             wait.until(
-                EC.presence_of_element_located((By.XPATH, '//*[@id="contents"]/ytmusic-shelf-renderer[1]/div[1]/h2/yt-formatted-string'))
+                EC.presence_of_element_located((By.XPATH, '//*[@id="contents"]/ytmusic-card-shelf-renderer/div[2]/div[2]/div[1]/div/div[2]/div[1]/yt-formatted-string'))
             )
         except:
             print('Page took too long to load')
@@ -286,7 +290,7 @@ def retrieve_youtube_links(playlist_detes, playlist_name):
 
 def download_from_youtube(url):
     
-    path = os.getenv('LOCALAPPDATA') + 'Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-7.1-essentials_build\\bin\\ffmpeg.exe'
+    path = os.getenv('LOCALAPPDATA') + 'Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0.1-essentials_build\\bin\\ffmpeg.exe'
 
     yt_opts = {
         'format': 'bestaudio/best',
