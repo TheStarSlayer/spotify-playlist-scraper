@@ -296,11 +296,22 @@ def download_from_youtube(url):
         'format': 'bestaudio/best',
         'outtmpl': '%(title)s.%(ext)s',
         'ffmpeg-location': path,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
+        'writethumbnail': 'true',
+        'postprocessors': [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            },
+            {
+                'key': 'FFmpegMetadata',
+                'add_metadata': True,
+            },
+            {
+                'key': 'EmbedThumbnail',
+                'already_have_thumbnail': False,
+            }
+        ],
         'noplaylist': True,
         'verbose': 0, # No output (except for errors)
     }
