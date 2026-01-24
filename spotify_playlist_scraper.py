@@ -4,7 +4,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -18,47 +17,44 @@ from urllib.parse import quote_plus
 
 import os
 from sanitize_filename import sanitize
+
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # Parser for bs4
 parser = 'lxml'
 
-options = Options()
-options.add_argument('--headless=new')
-options.add_argument("--disable-notifications")
-options.add_argument("window-size=1331,670")
-options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+def init_driver():
+    options = Options()
+    options.add_argument('--headless=new')
+    options.add_argument("--disable-notifications")
+    options.add_argument("window-size=1331,670")
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 
-# Setting up Selenium
-try:
-    driver = webdriver.Chrome(service = ChromeService(ChromeDriverManager().install()), options=options)
-except FileNotFoundError as fnfe:
-    print('chromedriver.exe not found. Re-download from repo and place it in the same location as script...')
-    exit(-1)
+    # Setting up Selenium
+    try:
+        driver = webdriver.Chrome(service = ChromeService(ChromeDriverManager().install()), options=options)
+    except FileNotFoundError as fnfe:
+        print('chromedriver.exe not found. Re-download from repo and place it in the same location as script...')
+        exit(-1)
 
-wait = WebDriverWait(driver, 20)
-action = ActionChains(driver)
+    wait = WebDriverWait(driver, 20)
+    action = ActionChains(driver)
+
+    return driver, wait, action
+
+m_driver, m_wait, m_action = init_driver()
 
 def init_playlist():
     playlist_url = str(input("Paste your playlist link: "))
     playlist_url = playlist_url.strip()
 
-    driver.get(playlist_url)
-
-    # # Dismiss alert
-    # try:
-    #     WebDriverWait(driver, 1).until(
-    #         EC.presence_of_element_located((By.XPATH, '/html/html')) # Deliberate mistake to prevent open app alert
-    #     )
-    # except Exception as e:
-    #     driver.execute_script('window.open();')
-    #     driver.switch_to.window(driver.window_handles[1])
-    #     driver.get(playlist_url)
-
+    m_driver.get(playlist_url)
+    
     # Retrieve playlist name
     playlist_name = ''
     try:
-        playlist_name = str(wait.until(
+        playlist_name = str(m_wait.until(
             EC.presence_of_element_located((By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[1]/div/main/section/div[1]/div[2]/div[3]/span[2]/span/h1'))
         ).text)
         print(f"Playlist Name: {playlist_name}")
@@ -68,26 +64,19 @@ def init_playlist():
     # Retrieve total number of songs
     total_songs = 0
     try:
-        total_songs = int((wait.until(
+        total_songs = int((m_wait.until(
             EC.presence_of_element_located((By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[1]/div/main/section/div[1]/div[2]/div[3]/div/div[2]/span[1]'))
         ).text).split(' ')[0])
         print(f"Total songs: {total_songs}")
     except Exception as e:
         print(e)
 
-    # # Remove header as it is harder to control scrollbar with it
-    # driver.execute_script('''
-    #     let header = document.querySelector(".facDIsOQo9q7kiWc4jSg");
-    #     header.parentNode.removeChild(header);
-    #                     ''')
-    # time.sleep(1)
-
     # Retrieve scroll bar element
-    scroll_bar = driver.find_element(By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[3]/div/div')
+    scroll_bar = m_driver.find_element(By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[3]/div/div')
 
     # Remove footer popup
     try:
-        footer_popup = wait.until(
+        footer_popup = m_wait.until(
             EC.presence_of_element_located((By.XPATH, '//*[@id="onetrust-close-btn-container"]/button'))
         )
         footer_popup.click()
@@ -95,10 +84,8 @@ def init_playlist():
     except:
         pass
 
-    #Remove 
-
     # Remove misleading scrollbar if exists
-    driver.execute_script('''
+    m_driver.execute_script('''
         let rightCard = document.querySelector(".LayoutResizer__resize-bar.LayoutResizer__inline-start");
         if (rightCard)
             rightCard.parentNode.removeChild(rightCard);
@@ -114,7 +101,7 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
     soup_list = []
 
     parse_only = SoupStrainer('div', attrs={"class": 'fNzI6FqqYnAGcGmJjQRG'})
-    soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
+    soup = BeautifulSoup(m_driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
 
     current_row = int(soup.contents[0]['aria-rowindex']) # First song of soup
     covered_rows = int(soup.contents[-1]['aria-rowindex']) # Last song of soup
@@ -129,21 +116,21 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
 
     # Activate scrollbar -- simulate mouse movement
     try:
-        active_area = wait.until(
+        active_area = m_wait.until(
             EC.presence_of_element_located((By.XPATH, '/html/body/div[4]/div/div[2]/div[6]/div/div[2]/div[3]/div'))
         )
     except:
         pass
         
-    action.move_to_element(active_area).perform()
-    for i in range(0, 3):
-        action.move_by_offset(0, 20).perform()  # Move by a very small offset
-        action.move_by_offset(0, -20).perform()  # Move it back
+    m_action.move_to_element(active_area).perform()
+    for _ in range(0, 3):
+        m_action.move_by_offset(0, 20).perform()  # Move by a very small offset
+        m_action.move_by_offset(0, -20).perform()  # Move it back
 
     scroll_size = scroll_bar.size
-    action.move_to_element(scroll_bar).perform()
-    action.move_by_offset(0, scroll_size['height']).perform()
-    action.click().perform()
+    m_action.move_to_element(scroll_bar).perform()
+    m_action.move_by_offset(0, scroll_size['height']).perform()
+    m_action.click().perform()
 
     # Logic to capture soup
     while not complete_read:
@@ -151,25 +138,24 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
             # Scroll and compare current soup's top song to previous soup's last song
             scroll(scroll_bar=scroll_bar, backwards=False)
             try:
-                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
+                soup = BeautifulSoup(m_driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
                 current_row = int(soup.contents[0]['aria-rowindex'])
                 temp_covered_rows = int(soup.contents[-1]['aria-rowindex'])
             except KeyError:
                 time.sleep(2)
-                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
+                soup = BeautifulSoup(m_driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
                 current_row = int(soup.contents[0]['aria-rowindex'])
                 temp_covered_rows = int(soup.contents[-1]['aria-rowindex'])
             
             # Move back if current row is greater than covered rows
             while current_row > covered_rows + 1:
                 scroll(scroll_bar=scroll_bar, backwards=True)
-                soup = BeautifulSoup(driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
+                soup = BeautifulSoup(m_driver.page_source, parser, parse_only=parse_only).contents[0].contents[0].contents[1].contents[1]
                 current_row = int(soup.contents[0]['aria-rowindex'])
 
             scroll_location = scroll_bar.location['y'] + scroll_size['height']
 
             if current_row in range(covered_rows - 10, covered_rows + 2) or temp_covered_rows >= total_songs + 1 or scroll_location >= 500:
-                
                 soup_list.append(soup)
                 covered_rows = int(soup.contents[-1]['aria-rowindex'])
                 print(f'Captured Soup: {current_row}, {covered_rows}')
@@ -185,17 +171,17 @@ def retrieve_songs_as_soup(scroll_bar, total_songs):
 def scroll(scroll_bar, backwards):
     scroll_size = scroll_bar.size
     # Move to bit lower than middle of the scrollbar
-    action.move_to_element(scroll_bar).perform()
-    action.move_by_offset(0, int(int(scroll_size['height'])*0.25)).perform()
+    m_action.move_to_element(scroll_bar).perform()
+    m_action.move_by_offset(0, int(int(scroll_size['height'])*0.25)).perform()
 
     if backwards == False:
         print("Forwards!")
-        action.click_and_hold().move_by_offset(0, 10).perform()
+        m_action.click_and_hold().move_by_offset(0, 50).perform()
     else:
         print("Backwards!")
-        action.click_and_hold().move_by_offset(0, -2).perform()
+        m_action.click_and_hold().move_by_offset(0, -17).perform()
 
-    action.release().perform()
+    m_action.release().perform()
     time.sleep(1)
 
     scroll_location = scroll_bar.location['y'] + scroll_size['height']
@@ -232,10 +218,11 @@ def soup_to_list(soup_list):
     print("Done")
     return playlist_detes
 
-def retrieve_youtube_links(playlist_detes, playlist_name):
+def retrieve_youtube_links_atomic(playlist_detes, driver=m_driver, wait=m_wait):
+
+    print("Thread entered!")
 
     root_url = 'https://music.youtube.com/'
-
     # Retrieve only anchor values
     parse_only = SoupStrainer('a', attrs={'class': 'yt-simple-endpoint style-scope yt-formatted-string', 'spellcheck': 'false'})
 
@@ -284,12 +271,42 @@ def retrieve_youtube_links(playlist_detes, playlist_name):
                         break
 
     driver.quit()
+
+def retrieve_youtube_links_exec(playlist_detes, playlist_name, total_songs):
+    
+    if total_songs < 24:
+        retrieve_youtube_links_atomic(playlist_detes=playlist_detes)
+    else:
+        chunked_pldts_len = int(total_songs / 6)
+        remaining_songs = int(total_songs % 6)
+        chunks = []
+        start_ptr = 0
+
+        for _ in range(5):
+            chunks.append(playlist_detes[start_ptr : start_ptr + chunked_pldts_len])
+            start_ptr += chunked_pldts_len
+        chunks.append(playlist_detes[start_ptr : start_ptr + chunked_pldts_len + remaining_songs])
+
+        threads = []
+        for i in range(5):
+            t_driver, t_wait, _ = init_driver()
+            t = threading.Thread(target=retrieve_youtube_links_atomic, args=(chunks[i], t_driver, t_wait))
+            threads.append(t)
+
+        t = threading.Thread(target=retrieve_youtube_links_atomic, args=(chunks[5], m_driver, m_wait))
+        threads.append(t)
+        
+        for t in threads:
+            t.start()
+
+        for t in threads:
+            t.join()
+   
     df = pd.DataFrame.from_dict(playlist_detes)
     df.to_excel('{pn}.xlsx'.format(pn=playlist_name), index=False)
     return df
 
 def download_from_youtube(url):
-    
     path = os.getenv('LOCALAPPDATA') + 'Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0.1-essentials_build\\bin\\ffmpeg.exe'
 
     yt_opts = {
@@ -344,11 +361,12 @@ def retrieve_spotify_playlist():
     start_retrieve = time.time()
 
     playlist_name, total_songs, scroll_bar = init_playlist()
+
     download = str(input("Do you want to download all the songs? (Y/n): ")).lower()
+
     soup_list = retrieve_songs_as_soup(scroll_bar=scroll_bar, total_songs=total_songs)
     playlist_detes = soup_to_list(soup_list=soup_list)
-
-    playlist_detes_df = retrieve_youtube_links(playlist_detes=playlist_detes, playlist_name=playlist_name)
+    playlist_detes_df = retrieve_youtube_links_exec(playlist_detes=playlist_detes, playlist_name=playlist_name, total_songs=total_songs)
 
     end_retrieve = time.time()
 
